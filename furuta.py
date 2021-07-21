@@ -195,12 +195,14 @@ class FurutaODE:
 
         self.q = np.array(
             [
-                theta0 % (2 * math.pi) if self.wrap_angles else theta0,
-                phi0 % (2 * math.pi) if self.wrap_angles else phi0,
+                theta0,
+                phi0,
                 dthetadt0,
                 dphidt0,
             ]
         )
+        if self.wrap_angles:
+            self.q[:2] %= 2 * math.pi
 
     def trans(self, u, step, rtol=1e-4, atol=1e-6):
         """Transitions the simulation a finite time step
@@ -249,8 +251,7 @@ class FurutaODE:
             if sol.success:
                 self.q = sol.y.flatten()
                 if self.wrap_angles:
-                    self.q[0] %= 2 * math.pi
-                    self.q[1] %= 2 * math.pi
+                    self.q[:2] %= 2 * math.pi
                 self.t = sol.t[0]
 
             return sol.success
@@ -337,8 +338,7 @@ class FurutaODE:
 
         z = sol.sol(t)
         if self.wrap_angles:
-            z[0, :] %= 2 * math.pi
-            z[1, :] %= 2 * math.pi
+            z[:2, :] %= 2 * math.pi
 
         legend = np.array(
             [r"$\theta$", r"$\phi$", r"$\dot{\theta}$", r"$\dot{\phi}$"]
