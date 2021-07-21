@@ -19,9 +19,9 @@ class FurutaODE:
         The output variable names where:
         t [s] is the time.
 
-        theta [rad] is the angle between z-axis and the pendulum. A theta =
-        0 indicates that this arm is standing up vertically, and theta = pi that
-        this arm is hanging vertically.
+        theta [rad] is the angle between z-axis and the pendulum. A theta = 0
+        indicates that the pendulum is standing up vertically, and theta = pi
+        that the pendulum is hanging vertically.
 
         phi [rad] is the angle between the arm and x-axis.
 
