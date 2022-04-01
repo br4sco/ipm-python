@@ -71,44 +71,47 @@ class FurutaODE:
     def _check_ys(ys):
         if not all(y in FurutaODE.ys for y in ys):
             raise ValueError(f"ys expected to be a subset of {FurutaODE.ys}")
+    
+    def mkf(self, u):
+        self._u = u
+        return self.f
+
+    def f(self, t, q, a, b, c, d2, K, J):
+        q1 = q[0]
+        q2 = q[1]
+        dq1 = q[2]
+        dq2 = q[3]
+        M = J * np.array(
+            [
+                [1.0, a * np.cos(q1)],
+                [a * np.cos(q1), b + np.sin(q1) ** 2.0],
+            ]
+        )
+        C = J * np.array(
+            [
+                [0, -dq2 * np.sin(q1) * np.cos(q1)],
+                [
+                    -a * dq1 * np.sin(q1)
+                    + dq2 * np.sin(q1) * np.cos(q1),
+                    dq1 * np.sin(q1) * np.cos(q1),
+                ],
+            ]
+        )
+        dvdq = J * np.array([-(d2) * np.sin(q1), 0.0])
+        dqdt = np.array([dq1, dq2, 0.0, 0.0])
+        dqdt[2:] += np.linalg.solve(
+            M, np.array([0.0, K * self._u(t)]) - C @ q[2:] - dvdq
+        )
+        return dqdt
 
     def __init__(self, wrap_angles=True):
-        def mkf(u):
-            def f(t, q, a, b, c, d2, K, J):
-                q1 = q[0]
-                q2 = q[1]
-                dq1 = q[2]
-                dq2 = q[3]
-                M = J * np.array(
-                    [
-                        [1.0, a * np.cos(q1)],
-                        [a * np.cos(q1), b + np.sin(q1) ** 2.0],
-                    ]
-                )
-                C = J * np.array(
-                    [
-                        [0, -dq2 * np.sin(q1) * np.cos(q1)],
-                        [
-                            -a * dq1 * np.sin(q1)
-                            + dq2 * np.sin(q1) * np.cos(q1),
-                            dq1 * np.sin(q1) * np.cos(q1),
-                        ],
-                    ]
-                )
-                dvdq = J * np.array([-(d2) * np.sin(q1), 0.0])
-                dqdt = np.array([dq1, dq2, 0.0, 0.0])
-                dqdt[2:] += np.linalg.solve(
-                    M, np.array([0.0, K * u(t)]) - C @ q[2:] - dvdq
-                )
-                return dqdt
 
-            return f
 
         self.q = None
         self.t = None
         self.wrap_angles = wrap_angles
         self._args = None
-        self._mkf = mkf
+        self._mkf = self.mkf
 
     def _solve(self, time, u, rtol, atol):
         tend = self.t + time
@@ -203,6 +206,11 @@ class FurutaODE:
         )
         if self.wrap_angles:
             self.q[:2] %= 2 * math.pi
+    
+
+
+    def func_replacing_lambda(self, arg_to_ignore):
+        return self._the_u
 
     def trans(self, u, step, rtol=1e-4, atol=1e-6):
         """Transitions the simulation a finite time step
@@ -237,8 +245,9 @@ class FurutaODE:
         tend = self.t + step
 
         try:
+            self._the_u = u
             sol = solve_ivp(
-                fun=self._mkf(lambda t: u),
+                fun=self._mkf(self.func_replacing_lambda),
                 t_span=(self.t, tend),
                 y0=self.q,
                 t_eval=[tend],
@@ -257,7 +266,7 @@ class FurutaODE:
             return sol.success
 
         except Exception as err:
-            logging.error(f"An exception occurred during solving: {err}")
+            logging.error(f"An exception occurred during solving for input {u}: {err}")
             return False
 
     def output(self, ys=["theta"]):
