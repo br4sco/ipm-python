@@ -72,51 +72,49 @@ class FurutaODE:
         if not all(y in FurutaODE.ys for y in ys):
             raise ValueError(f"ys expected to be a subset of {FurutaODE.ys}")
 
-    def __init__(self, wrap_angles=True):
-        def mkf(u):
-            def f(t, q, a, b, c, d2, K, J):
-                q1 = q[0]
-                q2 = q[1]
-                dq1 = q[2]
-                dq2 = q[3]
-                M = J * np.array(
-                    [
-                        [1.0, a * np.cos(q1)],
-                        [a * np.cos(q1), b + np.sin(q1) ** 2.0],
-                    ]
-                )
-                C = J * np.array(
-                    [
-                        [0, -dq2 * np.sin(q1) * np.cos(q1)],
-                        [
-                            -a * dq1 * np.sin(q1)
-                            + dq2 * np.sin(q1) * np.cos(q1),
-                            dq1 * np.sin(q1) * np.cos(q1),
-                        ],
-                    ]
-                )
-                dvdq = J * np.array([-(d2) * np.sin(q1), 0.0])
-                dqdt = np.array([dq1, dq2, 0.0, 0.0])
-                dqdt[2:] += np.linalg.solve(
-                    M, np.array([0.0, K * u(t)]) - C @ q[2:] - dvdq
-                )
-                return dqdt
+    def f(self, t, q, u, a, b, c, d2, K, J):
+        q1 = q[0]
+        q2 = q[1]
+        dq1 = q[2]
+        dq2 = q[3]
+        M = J * np.array(
+            [
+                [1.0, a * np.cos(q1)],
+                [a * np.cos(q1), b + np.sin(q1) ** 2.0],
+            ]
+        )
+        C = J * np.array(
+            [
+                [0, -dq2 * np.sin(q1) * np.cos(q1)],
+                [
+                    -a * dq1 * np.sin(q1)
+                    + dq2 * np.sin(q1) * np.cos(q1),
+                    dq1 * np.sin(q1) * np.cos(q1),
+                ],
+            ]
+        )
+        dvdq = J * np.array([-(d2) * np.sin(q1), 0.0])
+        dqdt = np.array([dq1, dq2, 0.0, 0.0])
+        dqdt[2:] += np.linalg.solve(
+            M, np.array([0.0, K * u]) - C @ q[2:] - dvdq
+        )
+        return dqdt
 
-            return f
+    def __init__(self, wrap_angles=True):
+
 
         self.q = None
         self.t = None
         self.wrap_angles = wrap_angles
         self._args = None
-        self._mkf = mkf
 
     def _solve(self, time, u, rtol, atol):
         tend = self.t + time
         return solve_ivp(
-            fun=self._mkf(u),
+            fun=self.f,
             t_span=(self.t, tend),
             y0=self.q,
-            args=self._args,
+            args=(u, *self._args),
             rtol=rtol,
             atol=atol,
             dense_output=True,
@@ -203,6 +201,8 @@ class FurutaODE:
         )
         if self.wrap_angles:
             self.q[:2] %= 2 * math.pi
+    
+
 
     def trans(self, u, step, rtol=1e-4, atol=1e-6):
         """Transitions the simulation a finite time step
@@ -238,11 +238,11 @@ class FurutaODE:
 
         try:
             sol = solve_ivp(
-                fun=self._mkf(lambda t: u),
+                fun=self.f,
                 t_span=(self.t, tend),
                 y0=self.q,
                 t_eval=[tend],
-                args=self._args,
+                args=(u, *self._args),
                 rtol=rtol,
                 atol=atol,
                 method=FurutaODE.integration_method,
@@ -257,7 +257,7 @@ class FurutaODE:
             return sol.success
 
         except Exception as err:
-            logging.error(f"An exception occurred during solving: {err}")
+            logging.error(f"An exception occurred during solving for input {u}: {err}")
             return False
 
     def output(self, ys=["theta"]):
@@ -291,7 +291,7 @@ class FurutaODE:
         return out
 
     def plot(
-        self, time=2.0, u=lambda t: 0.0, rtol=1e-4, atol=1e-6, ys=["theta"]
+        self, time=2.0, u=0.0, rtol=1e-4, atol=1e-6, ys=["theta"]
     ):
         """Computes a dense solution to the model over a time-interval and then plots
         the results
@@ -301,9 +301,8 @@ class FurutaODE:
         time : float, optional
             The length of the simulation interval (default is 2.0)
 
-        u : function float -> float, optional
-            The input function. It must be defined over the interval [t, t +
-            time] (default is lambda t: 0.0)
+        u : float, optional
+            Control input (controls the torque output of the motor)
 
         rtol : float, optional
             The relative tolarance of the underlying ode solver (default is 1e-4)
