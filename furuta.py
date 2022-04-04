@@ -71,12 +71,8 @@ class FurutaODE:
     def _check_ys(ys):
         if not all(y in FurutaODE.ys for y in ys):
             raise ValueError(f"ys expected to be a subset of {FurutaODE.ys}")
-    
-    def mkf(self, u):
-        self._u = u
-        return self.f
 
-    def f(self, t, q, a, b, c, d2, K, J):
+    def f(self, t, q, u, a, b, c, d2, K, J):
         q1 = q[0]
         q2 = q[1]
         dq1 = q[2]
@@ -100,7 +96,7 @@ class FurutaODE:
         dvdq = J * np.array([-(d2) * np.sin(q1), 0.0])
         dqdt = np.array([dq1, dq2, 0.0, 0.0])
         dqdt[2:] += np.linalg.solve(
-            M, np.array([0.0, K * self._u(t)]) - C @ q[2:] - dvdq
+            M, np.array([0.0, K * u]) - C @ q[2:] - dvdq
         )
         return dqdt
 
@@ -111,15 +107,14 @@ class FurutaODE:
         self.t = None
         self.wrap_angles = wrap_angles
         self._args = None
-        self._mkf = self.mkf
 
     def _solve(self, time, u, rtol, atol):
         tend = self.t + time
         return solve_ivp(
-            fun=self._mkf(u),
+            fun=self.f,
             t_span=(self.t, tend),
             y0=self.q,
-            args=self._args,
+            args=(u, *self._args),
             rtol=rtol,
             atol=atol,
             dense_output=True,
@@ -209,9 +204,6 @@ class FurutaODE:
     
 
 
-    def func_replacing_lambda(self, arg_to_ignore):
-        return self._the_u
-
     def trans(self, u, step, rtol=1e-4, atol=1e-6):
         """Transitions the simulation a finite time step
 
@@ -245,13 +237,12 @@ class FurutaODE:
         tend = self.t + step
 
         try:
-            self._the_u = u
             sol = solve_ivp(
-                fun=self._mkf(self.func_replacing_lambda),
+                fun=self.f,
                 t_span=(self.t, tend),
                 y0=self.q,
                 t_eval=[tend],
-                args=self._args,
+                args=(u, *self._args),
                 rtol=rtol,
                 atol=atol,
                 method=FurutaODE.integration_method,
@@ -300,7 +291,7 @@ class FurutaODE:
         return out
 
     def plot(
-        self, time=2.0, u=lambda t: 0.0, rtol=1e-4, atol=1e-6, ys=["theta"]
+        self, time=2.0, u=0.0, rtol=1e-4, atol=1e-6, ys=["theta"]
     ):
         """Computes a dense solution to the model over a time-interval and then plots
         the results
@@ -310,9 +301,8 @@ class FurutaODE:
         time : float, optional
             The length of the simulation interval (default is 2.0)
 
-        u : function float -> float, optional
-            The input function. It must be defined over the interval [t, t +
-            time] (default is lambda t: 0.0)
+        u : float, optional
+            Control input (controls the torque output of the motor)
 
         rtol : float, optional
             The relative tolarance of the underlying ode solver (default is 1e-4)
