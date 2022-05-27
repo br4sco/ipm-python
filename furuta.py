@@ -72,7 +72,11 @@ class FurutaODE:
         if not all(y in FurutaODE.ys for y in ys):
             raise ValueError(f"ys expected to be a subset of {FurutaODE.ys}")
 
-    def f(self, t, q, u, a, b, c, d2, K, J):
+    def f(self, t, q, u, a, b, c, d2, K, J, b1, b2):
+        """Implementation based on equation (2.10) in
+        'Furuta’s Pendulum: A Conservative Nonlinear Model for Theory and
+         Practise', J. Á. Acosta.
+        """
         q1 = q[0]
         q2 = q[1]
         dq1 = q[2]
@@ -85,11 +89,10 @@ class FurutaODE:
         )
         C = J * np.array(
             [
-                [0, -dq2 * np.sin(q1) * np.cos(q1)],
+                [b1, -dq2 * np.sin(q1) * np.cos(q1)],
                 [
-                    -a * dq1 * np.sin(q1)
-                    + dq2 * np.sin(q1) * np.cos(q1),
-                    dq1 * np.sin(q1) * np.cos(q1),
+                    -a * dq1 * np.sin(q1) + dq2 * np.sin(q1) * np.cos(q1),
+                    dq1 * np.sin(q1) * np.cos(q1) + b2,
                 ],
             ]
         )
@@ -100,8 +103,38 @@ class FurutaODE:
         )
         return dqdt
 
-    def __init__(self, wrap_angles=True):
+    # def f_hamiltonian(self, t, q, u, a, b, c, d2, K, J):
+    #     """Implements equaiton (2.22) in
+    #     'Furuta’s Pendulum: A Conservative Nonlinear Model for Theory and
+    #      Practise', J. Á. Acosta.
+    #     """
+    #     q1 = q[0]
+    #     q2 = q[1]
+    #     p1 = q[2]  # note that this is not dthetadt
+    #     p2 = q[2]  # note that this it not dphidt
+    #     det = J * (b + (np.sin(q1) ** 2) * p1 - (a * np.cos(q1)) ** 2)
+    #     return np.array(
+    #         [
+    #             ((b + np.sin(q1) ** 2) * p1 - a * p2 * np.cos(q1)) / det,
+    #             (p2 - a * p1 * np.cos(q1)) / det,
+    #             (
+    #                 J
+    #                 * (
+    #                     (b * np.sin(q1) ** 2) * p1**2
+    #                     + p2**2
+    #                     - 2 * a * p1 * p2 * np.cos(q1)
+    #                 )
+    #                 * ((1 + a**2) * np.sin(2 * q1))
+    #             )
+    #             / (2 * det**2)
+    #             + J * d2 * np.sin(q1)
+    #             - (p1**2 * np.sin(2 * q1) + 2 * a * p1 * p2 * np.sin(q1))
+    #             / (2 * det),
+    #             J * c * d2 * u,
+    #         ]
+    #     )
 
+    def __init__(self, wrap_angles=True):
 
         self.q = None
         self.t = None
@@ -139,6 +172,8 @@ class FurutaODE:
         J=1.0,
         Ja=1.0,
         K=1.0,
+        b1=0.01,
+        b2=0.01,
     ):
         """Initializes the model and simulation
 
@@ -148,7 +183,7 @@ class FurutaODE:
             The initial time [s] (default is 0.0)
 
         theta0 : float, optional
-            The inital value of theta [rad] (default is pi)
+            The inital value of theta [rad] (default is π)
 
         phi0 : float, optional
             The inital value of phi [rad] (default is 0.0)
@@ -172,8 +207,8 @@ class FurutaODE:
             Acceleration of gravity [m / s^2] (default is 1.0)
 
         J : float, optional
-            Moment of inertia of the pendulum w.r.t. the pivot [kg m^2] (default
-            is 1.0)
+            Moment of inertia of the pendulum w.r.t. the pivot [kg m^2]
+            (default is 1.0)
 
         Ja : float, optional
             Moment of inertia of the arm and the motor [kg m^2] (default is
@@ -181,14 +216,20 @@ class FurutaODE:
 
         K : float, optional
             Constant torque [N m / v] (default is 1.0)
+
+        b1 : float, option
+            Viscous damping coefficient in motor joint (default is 0.01)
+
+        b2 : float, option
+            Viscous damping coefficient in pivot joint (default is 0.01)
         """
 
         a = m * r * l / J
-        b = (Ja + m * r ** 2.0) / J
+        b = (Ja + m * r**2.0) / J
         c = K / (m * g * l)
         d2 = m * g * l / J
 
-        self._args = (a, b, c, d2, J, K)
+        self._args = (a, b, c, d2, J, K, b1, b2)
         self.t = t0
 
         self.q = np.array(
@@ -201,8 +242,6 @@ class FurutaODE:
         )
         if self.wrap_angles:
             self.q[:2] %= 2 * math.pi
-    
-
 
     def trans(self, u, step, rtol=1e-4, atol=1e-6):
         """Transitions the simulation a finite time step
@@ -257,7 +296,9 @@ class FurutaODE:
             return sol.success
 
         except Exception as err:
-            logging.error(f"An exception occurred during solving for input {u}: {err}")
+            logging.error(
+                f"An exception occurred during solving for input {u}: {err}"
+            )
             return False
 
     def output(self, ys=["theta"]):
@@ -290,19 +331,18 @@ class FurutaODE:
 
         return out
 
-    def plot(
-        self, time=2.0, u=0.0, rtol=1e-4, atol=1e-6, ys=["theta"]
-    ):
-        """Computes a dense solution to the model over a time-interval and then plots
-        the results
+    def plot(self, time=2.0, u=0.0, rtol=1e-4, atol=1e-6, ys=["theta"]):
+        """Computes a dense solution to the model over a time-interval and then
+        plots the results
 
         Parameters
         ---------
         time : float, optional
             The length of the simulation interval (default is 2.0)
 
-        u : float, optional
-            Control input (controls the torque output of the motor)
+        samples : float, optional
+            Control input (controls the torque output of the motor,
+            default is 0.0)
 
         rtol : float, optional
             The relative tolarance of the underlying ode solver (default is 1e-4)
