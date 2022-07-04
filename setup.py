@@ -1,11 +1,13 @@
 from setuptools import setup, find_packages
 
-from ipm_python import __version__
+from ipm_furuta import __version__
 
 setup(
-    name="ipm_python",
+    name="ipm_furuta",
     version=__version__,
     license="MIT License",
+    author="Oskar Eriksson",
+    url="https://github.com/br4sco/ipm-python",
     keywords=["ipm", "furuta", "model"],
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -18,6 +20,6 @@ setup(
     ],
     packages=find_packages(
         where=".",
-        include=["ipm_python"],
+        include=["ipm_furuta"],
     ),
 )
