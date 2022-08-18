@@ -1,4 +1,4 @@
-.PHONY: coherent
+.PHONY: coherent build
 
 MODULES = ipm_furuta
 
@@ -11,3 +11,7 @@ coherent:
 	echo '$(VERSION)'
 
 	sed -i 's|^__version__ = ".*"$$|$(VERSION)|g' $(foreach mod, $(MODULES), $(mod)/__init__.py)
+
+build: coherent
+	rm -rf dist
+	python3 setup.py sdist
