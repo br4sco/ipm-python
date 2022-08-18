@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-from ipm_furuta import __version__
+__version__ = "0.0.1"
 
 setup(
     name="ipm_furuta",
@@ -16,6 +16,7 @@ setup(
     ],
     install_requires=[
         "matplotlib",
+        "numpy",
         "scipy"
     ],
     packages=find_packages(
