@@ -13,5 +13,16 @@ style interface is there mainly for completeness.
 Installing dependencies via the pip package manager:
 
 ```
-pip install scipy matplotlib 
+pip install numpy scipy matplotlib
+```
+
+## Packaging
+
+Make sure to run `make coherent` to ensure that the version from setup.py gets
+propagated to the module.
+
+Build the package using the setup.py script:
+
+```
+python setup.py sdist
 ```
