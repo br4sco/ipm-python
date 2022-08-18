@@ -6,7 +6,7 @@ setup(
     name="ipm_furuta",
     version=__version__,
     license="MIT License",
-    author="Oskar Eriksson",
+    author="Oscar Eriksson",
     url="https://github.com/br4sco/ipm-python",
     keywords=["ipm", "furuta", "model"],
     classifiers=[
