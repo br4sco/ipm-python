@@ -89,10 +89,10 @@ class FurutaODE:
         )
         C = J * np.array(
             [
-                [b1, -dq2 * np.sin(q1) * np.cos(q1)],
+                [b2, -dq2 * np.sin(q1) * np.cos(q1)],
                 [
                     -a * dq1 * np.sin(q1) + dq2 * np.sin(q1) * np.cos(q1),
-                    dq1 * np.sin(q1) * np.cos(q1) + b2,
+                    dq1 * np.sin(q1) * np.cos(q1) + b1,
                 ],
             ]
         )
